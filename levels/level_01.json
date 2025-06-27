@@ -1,0 +1,28 @@
+{
+  "name": "Tutorial: Color-Based Gravity",
+  "description": "Blue=Normal, Red=Heavy, Green=Light gravity. Use the blue planet!",
+  "max_shots": 3,
+  "spaceship_start": {
+    "x": 100,
+    "y": 300
+  },
+  "objects": [
+    {
+      "type": "planet",
+      "x": 400,
+      "y": 300,
+      "mass": 80,
+      "radius": 25,
+      "color": [
+        50,
+        50,
+        255
+      ]
+    },
+    {
+      "type": "goal",
+      "x": 700,
+      "y": 300
+    }
+  ]
+}

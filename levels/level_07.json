@@ -1,0 +1,58 @@
+{
+  "name": "Push and Pull Chaos",
+  "description": "Master anti-gravity wells and heavy planets in this chaotic level!",
+  "max_shots": 4,
+  "spaceship_start": {
+    "x": 100,
+    "y": 100
+  },
+  "objects": [
+    {
+      "type": "anti_gravity",
+      "x": 250,
+      "y": 200,
+      "mass": 80
+    },
+    {
+      "type": "planet",
+      "x": 400,
+      "y": 300,
+      "mass": 120,
+      "radius": 35,
+      "color": [
+        255,
+        30,
+        30
+      ]
+    },
+    {
+      "type": "anti_gravity",
+      "x": 550,
+      "y": 150,
+      "mass": 60
+    },
+    {
+      "type": "planet",
+      "x": 300,
+      "y": 450,
+      "mass": 90,
+      "radius": 25,
+      "color": [
+        255,
+        255,
+        50
+      ]
+    },
+    {
+      "type": "obstacle",
+      "x": 450,
+      "y": 200,
+      "radius": 12
+    },
+    {
+      "type": "goal",
+      "x": 750,
+      "y": 400
+    }
+  ]
+}

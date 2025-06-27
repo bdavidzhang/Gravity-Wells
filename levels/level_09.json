@@ -1,0 +1,82 @@
+{
+  "name": "The Final Challenge",
+  "description": "Everything you've learned! All object types in one epic level.",
+  "max_shots": 5,
+  "spaceship_start": {
+    "x": 80,
+    "y": 500
+  },
+  "objects": [
+    {
+      "type": "planet",
+      "x": 200,
+      "y": 400,
+      "mass": 100,
+      "radius": 30,
+      "color": [
+        200,
+        50,
+        200
+      ]
+    },
+    {
+      "type": "obstacle",
+      "x": 300,
+      "y": 300,
+      "radius": 18
+    },
+    {
+      "type": "anti_gravity",
+      "x": 400,
+      "y": 200,
+      "mass": 80
+    },
+    {
+      "type": "black_hole",
+      "x": 500,
+      "y": 350,
+      "mass": 400
+    },
+    {
+      "type": "planet",
+      "x": 350,
+      "y": 500,
+      "mass": 70,
+      "radius": 22,
+      "color": [
+        50,
+        255,
+        50
+      ]
+    },
+    {
+      "type": "obstacle",
+      "x": 600,
+      "y": 250,
+      "radius": 15
+    },
+    {
+      "type": "planet",
+      "x": 700,
+      "y": 400,
+      "mass": 90,
+      "radius": 28,
+      "color": [
+        255,
+        30,
+        30
+      ]
+    },
+    {
+      "type": "anti_gravity",
+      "x": 750,
+      "y": 150,
+      "mass": 60
+    },
+    {
+      "type": "goal",
+      "x": 850,
+      "y": 300
+    }
+  ]
+}

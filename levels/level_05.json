@@ -1,0 +1,58 @@
+{
+  "name": "Multi-Color Gravity Maze",
+  "description": "Purple=Super Heavy, Yellow=Variable, Green=Light. Navigate the maze!",
+  "max_shots": 4,
+  "spaceship_start": {
+    "x": 50,
+    "y": 300
+  },
+  "objects": [
+    {
+      "type": "planet",
+      "x": 200,
+      "y": 150,
+      "mass": 80,
+      "radius": 28,
+      "color": [
+        200,
+        50,
+        200
+      ]
+    },
+    {
+      "type": "planet",
+      "x": 450,
+      "y": 400,
+      "mass": 90,
+      "radius": 30,
+      "color": [
+        255,
+        255,
+        50
+      ]
+    },
+    {
+      "type": "planet",
+      "x": 650,
+      "y": 200,
+      "mass": 100,
+      "radius": 25,
+      "color": [
+        50,
+        255,
+        50
+      ]
+    },
+    {
+      "type": "obstacle",
+      "x": 400,
+      "y": 250,
+      "radius": 15
+    },
+    {
+      "type": "goal",
+      "x": 800,
+      "y": 300
+    }
+  ]
+}

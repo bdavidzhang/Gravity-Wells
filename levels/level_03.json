@@ -1,0 +1,40 @@
+{
+  "name": "Anti-Gravity Introduction",
+  "description": "Pink anti-gravity wells push you away! Use them to avoid obstacles.",
+  "max_shots": 3,
+  "spaceship_start": {
+    "x": 100,
+    "y": 300
+  },
+  "objects": [
+    {
+      "type": "obstacle",
+      "x": 350,
+      "y": 300,
+      "radius": 20
+    },
+    {
+      "type": "anti_gravity",
+      "x": 400,
+      "y": 250,
+      "mass": 60
+    },
+    {
+      "type": "planet",
+      "x": 600,
+      "y": 350,
+      "mass": 80,
+      "radius": 25,
+      "color": [
+        50,
+        255,
+        50
+      ]
+    },
+    {
+      "type": "goal",
+      "x": 750,
+      "y": 300
+    }
+  ]
+}

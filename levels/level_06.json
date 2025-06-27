@@ -1,0 +1,52 @@
+{
+  "name": "The Obstacle Course",
+  "description": "Dodge red obstacles while using gravity wells to reach the goal!",
+  "max_shots": 3,
+  "spaceship_start": {
+    "x": 80,
+    "y": 400
+  },
+  "objects": [
+    {
+      "type": "obstacle",
+      "x": 200,
+      "y": 350,
+      "radius": 18
+    },
+    {
+      "type": "obstacle",
+      "x": 350,
+      "y": 250,
+      "radius": 15
+    },
+    {
+      "type": "obstacle",
+      "x": 500,
+      "y": 400,
+      "radius": 20
+    },
+    {
+      "type": "planet",
+      "x": 300,
+      "y": 500,
+      "mass": 100,
+      "radius": 30,
+      "color": [
+        50,
+        50,
+        255
+      ]
+    },
+    {
+      "type": "anti_gravity",
+      "x": 450,
+      "y": 150,
+      "mass": 70
+    },
+    {
+      "type": "goal",
+      "x": 700,
+      "y": 200
+    }
+  ]
+}

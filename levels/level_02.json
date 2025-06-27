@@ -1,0 +1,28 @@
+{
+  "name": "Heavy Red Planet Challenge",
+  "description": "Red planets have 2x gravity! Use the heavy pull to slingshot around.",
+  "max_shots": 2,
+  "spaceship_start": {
+    "x": 100,
+    "y": 400
+  },
+  "objects": [
+    {
+      "type": "planet",
+      "x": 400,
+      "y": 300,
+      "mass": 100,
+      "radius": 35,
+      "color": [
+        255,
+        30,
+        30
+      ]
+    },
+    {
+      "type": "goal",
+      "x": 400,
+      "y": 150
+    }
+  ]
+}

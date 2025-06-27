@@ -1,0 +1,34 @@
+{
+  "name": "Black Hole Gauntlet",
+  "description": "Navigate past the deadly black hole! One wrong move and you're space dust.",
+  "max_shots": 2,
+  "spaceship_start": {
+    "x": 100,
+    "y": 500
+  },
+  "objects": [
+    {
+      "type": "black_hole",
+      "x": 400,
+      "y": 300,
+      "mass": 400
+    },
+    {
+      "type": "planet",
+      "x": 250,
+      "y": 200,
+      "mass": 60,
+      "radius": 20,
+      "color": [
+        50,
+        255,
+        50
+      ]
+    },
+    {
+      "type": "goal",
+      "x": 650,
+      "y": 150
+    }
+  ]
+}
