@@ -95,7 +95,13 @@ class LevelManager:
         self.levels = []
         self.current_level_index = 0
         self.levels_dir = "levels"
+        self.progress_file = "progress.json"
+        self.completed_levels = set()  # Set of completed level indices
+        self.unlocked_levels = {0}  # Set of unlocked level indices (level 0 always unlocked)
+        
+        self.load_progress()
         self.load_all_levels()
+        self.update_unlocked_levels()
     
     def load_all_levels(self):
         """Load all available levels"""
@@ -120,6 +126,58 @@ class LevelManager:
         # Ensure we have at least one level
         if not self.levels:
             self.levels.append(self.create_tutorial_level())
+    
+    def load_progress(self):
+        """Load player progress from file"""
+        if os.path.exists(self.progress_file):
+            try:
+                with open(self.progress_file, 'r') as f:
+                    data = json.load(f)
+                    self.completed_levels = set(data.get("completed_levels", []))
+                    self.current_level_index = data.get("current_level_index", 0)
+            except Exception as e:
+                print(f"Error loading progress: {e}")
+                self.completed_levels = set()
+                self.current_level_index = 0
+    
+    def save_progress(self):
+        """Save player progress to file"""
+        try:
+            data = {
+                "completed_levels": list(self.completed_levels),
+                "current_level_index": self.current_level_index
+            }
+            with open(self.progress_file, 'w') as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            print(f"Error saving progress: {e}")
+    
+    def update_unlocked_levels(self):
+        """Update which levels are unlocked based on completed levels"""
+        self.unlocked_levels = {0}  # First level always unlocked
+        
+        # Unlock next level for each completed level
+        for completed_idx in self.completed_levels:
+            next_level_idx = completed_idx + 1
+            if next_level_idx < len(self.levels):
+                self.unlocked_levels.add(next_level_idx)
+    
+    def complete_level(self, level_index):
+        """Mark a level as completed"""
+        if 0 <= level_index < len(self.levels):
+            self.completed_levels.add(level_index)
+            self.update_unlocked_levels()
+            self.save_progress()
+            return True
+        return False
+    
+    def is_level_unlocked(self, level_index):
+        """Check if a level is unlocked"""
+        return level_index in self.unlocked_levels
+    
+    def is_level_completed(self, level_index):
+        """Check if a level is completed"""
+        return level_index in self.completed_levels
     
     def create_default_levels(self):
         """Create default level files with enhanced variety and all object types"""
@@ -505,18 +563,32 @@ class LevelManager:
         return None
     
     def next_level(self):
-        """Advance to next level"""
-        if self.current_level_index < len(self.levels) - 1:
-            self.current_level_index += 1
+        """Advance to next level (only if unlocked)"""
+        next_index = self.current_level_index + 1
+        if next_index < len(self.levels) and self.is_level_unlocked(next_index):
+            self.current_level_index = next_index
+            self.save_progress()
             return True
         return False
     
     def previous_level(self):
-        """Go to previous level"""
-        if self.current_level_index > 0:
-            self.current_level_index -= 1
+        """Go to previous level (only if unlocked)"""
+        prev_index = self.current_level_index - 1
+        if prev_index >= 0 and self.is_level_unlocked(prev_index):
+            self.current_level_index = prev_index
+            self.save_progress()
             return True
         return False
+    
+    def can_go_to_next_level(self):
+        """Check if player can advance to next level"""
+        next_index = self.current_level_index + 1
+        return next_index < len(self.levels) and self.is_level_unlocked(next_index)
+    
+    def can_go_to_previous_level(self):
+        """Check if player can go to previous level"""
+        prev_index = self.current_level_index - 1
+        return prev_index >= 0 and self.is_level_unlocked(prev_index)
     
     def restart_level(self):
         """Restart current level"""
@@ -529,5 +601,10 @@ class LevelManager:
         return {
             "current": self.current_level_index + 1,
             "total": len(self.levels),
-            "name": self.get_current_level().name if self.get_current_level() else "Unknown"
+            "name": self.get_current_level().name if self.get_current_level() else "Unknown",
+            "is_completed": self.is_level_completed(self.current_level_index),
+            "can_go_next": self.can_go_to_next_level(),
+            "can_go_previous": self.can_go_to_previous_level(),
+            "completed_count": len(self.completed_levels),
+            "unlocked_count": len(self.unlocked_levels)
         }

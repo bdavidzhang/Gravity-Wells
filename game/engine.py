@@ -100,14 +100,16 @@ class GameEngine:
             self.restart_level()
         
         elif key == pygame.K_n:
-            # Next level
-            if self.level_manager.next_level():
-                self.load_current_level()
+            # Next level (only if unlocked)
+            if self.level_manager.can_go_to_next_level():
+                if self.level_manager.next_level():
+                    self.load_current_level()
         
         elif key == pygame.K_p:
-            # Previous level
-            if self.level_manager.previous_level():
-                self.load_current_level()
+            # Previous level (only if unlocked)
+            if self.level_manager.can_go_to_previous_level():
+                if self.level_manager.previous_level():
+                    self.load_current_level()
         
         elif key == pygame.K_SPACE:
             # Use thruster (if spaceship is flying)
@@ -235,6 +237,7 @@ class GameEngine:
             if self.spaceship.collides_with(obj):
                 if isinstance(obj, type(self.current_level.goal)) and obj == self.current_level.goal:
                     # Level completed!
+                    self.level_manager.complete_level(self.level_manager.current_level_index)
                     self.state = GameState.LEVEL_COMPLETE
                     break
                 else:
@@ -380,13 +383,25 @@ class GameEngine:
                                (power_bar_start.x, power_bar_start.y, power_bar_length, 8))
     
     def draw_ui(self):
-        """Draw enhanced user interface with cool colors"""
-        # Level info with enhanced styling
+        """Draw enhanced user interface with cool colors and unlock status"""
+        # Level info with enhanced styling and unlock status
         if self.current_level:
             progress = self.level_manager.get_level_progress()
             level_text = f"Level {progress['current']}/{progress['total']}: {progress['name']}"
-            text_surface = self.font.render(level_text, True, (100, 255, 255))  # Bright cyan
+            
+            # Color code based on completion status
+            if progress['is_completed']:
+                level_color = (100, 255, 100)  # Green for completed
+            else:
+                level_color = (100, 255, 255)  # Bright cyan for current
+                
+            text_surface = self.font.render(level_text, True, level_color)
             self.screen.blit(text_surface, (10, 10))
+            
+            # Progress summary
+            progress_text = f"Progress: {progress['completed_count']}/{progress['total']} completed | {progress['unlocked_count']}/{progress['total']} unlocked"
+            progress_surface = self.small_font.render(progress_text, True, (200, 200, 255))
+            self.screen.blit(progress_surface, (10, 40))
             
             # Shots info with color coding
             shots_text = f"Shots: {self.current_level.shots_used}/{self.current_level.max_shots}"
@@ -398,7 +413,7 @@ class GameEngine:
                 shots_color = (100, 255, 100)  # Green when plenty left
             
             shots_surface = self.small_font.render(shots_text, True, shots_color)
-            self.screen.blit(shots_surface, (10, 50))
+            self.screen.blit(shots_surface, (10, 70))
             
             # Fuel info with gradient based on fuel level
             if self.spaceship:
@@ -410,18 +425,26 @@ class GameEngine:
                 )
                 fuel_text = f"Fuel: {self.spaceship.fuel}/{self.spaceship.max_fuel}"
                 fuel_surface = self.small_font.render(fuel_text, True, fuel_color)
-                self.screen.blit(fuel_surface, (10, 75))
+                self.screen.blit(fuel_surface, (10, 95))
         
         # Game state messages with enhanced styling
         if self.state == GameState.LEVEL_COMPLETE:
             msg = "*** LEVEL COMPLETE! ***"
             msg_surface = self.font.render(msg, True, (100, 255, 150))
-            rect = msg_surface.get_rect(center=(self.screen_width//2, self.screen_height//2 - 20))
+            rect = msg_surface.get_rect(center=(self.screen_width//2, self.screen_height//2 - 40))
             self.screen.blit(msg_surface, rect)
             
-            next_msg = "Press N for next level, R to restart"
-            next_surface = self.small_font.render(next_msg, True, (200, 200, 255))
-            next_rect = next_surface.get_rect(center=(self.screen_width//2, self.screen_height//2 + 10))
+            # Show appropriate message based on unlock status
+            progress = self.level_manager.get_level_progress()
+            if progress['can_go_next']:
+                next_msg = "🎉 New level unlocked! Press N for next level, R to restart"
+                next_color = (150, 255, 150)
+            else:
+                next_msg = "🏆 All levels completed! You're a master pilot! Press R to replay"
+                next_color = (255, 255, 100)
+                
+            next_surface = self.small_font.render(next_msg, True, next_color)
+            next_rect = next_surface.get_rect(center=(self.screen_width//2, self.screen_height//2 - 10))
             self.screen.blit(next_surface, next_rect)
         
         elif self.state == GameState.GAME_OVER:
@@ -445,9 +468,30 @@ class GameEngine:
             msg_surface = self.small_font.render(msg, True, (255, 255, 100))
             self.screen.blit(msg_surface, (10, self.screen_height - 30))
         
-        # Controls help with better formatting
-        help_text = "Controls: R=Restart | N=Next | P=Previous | SPACE=Thruster | SHIFT=Brake | DRAG=Aim & Launch | ESC=Quit"
-        help_surface = self.small_font.render(help_text, True, (180, 180, 255))
+        # Navigation controls with unlock status
+        progress = self.level_manager.get_level_progress()
+        nav_parts = []
+        
+        if progress['can_go_previous']:
+            nav_parts.append("P=Previous")
+        else:
+            nav_parts.append("P=Previous(🔒)")
+            
+        if progress['can_go_next']:
+            nav_parts.append("N=Next")
+        else:
+            nav_parts.append("N=Next(🔒)")
+        
+        nav_text = " | ".join(nav_parts)
+        controls_text = f"Controls: R=Restart | {nav_text} | SPACE=Thruster | SHIFT=Brake | DRAG=Aim & Launch | ESC=Quit"
+        
+        # Color code the control text based on availability
+        if progress['can_go_next'] and progress['can_go_previous']:
+            help_color = (180, 180, 255)  # Normal blue
+        else:
+            help_color = (255, 200, 150)  # Orange to indicate restrictions
+        
+        help_surface = self.small_font.render(controls_text, True, help_color)
         self.screen.blit(help_surface, (10, self.screen_height - 60))
     
     def draw_gravity_info(self):
@@ -459,7 +503,7 @@ class GameEngine:
         planets = [obj for obj in self.current_level.objects if hasattr(obj, 'color_type')]
         
         if planets:
-            info_y = 100
+            info_y = 120  # Adjusted for new UI layout
             info_text = "*** Gravity Types ***"
             info_surface = self.small_font.render(info_text, True, (255, 255, 150))
             self.screen.blit(info_surface, (10, info_y))
