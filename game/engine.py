@@ -47,6 +47,11 @@ class GameEngine:
         self.aim_start = Vector2D(0, 0)
         self.aim_power = 0
         
+        # Dynamic aiming (like Angry Birds slingshot)
+        self.aiming_active = False
+        self.slingshot_base = Vector2D(0, 0)  # Base position for slingshot
+        self.max_slingshot_distance = 120  # Maximum slingshot pull distance
+        
         # UI settings
         self.font = pygame.font.Font(None, 36)
         self.small_font = pygame.font.Font(None, 24)
@@ -107,9 +112,20 @@ class GameEngine:
         elif key == pygame.K_SPACE:
             # Use thruster (if spaceship is flying)
             if self.state == GameState.FLYING and self.spaceship.fuel > 0:
-                # Apply small thrust in direction of mouse
-                thrust_dir = self.mouse_pos - self.spaceship.position
-                self.spaceship.use_thruster(thrust_dir.normalize(), 30)
+                # Apply small thrust in current velocity direction
+                if self.spaceship.velocity.magnitude() > 0:
+                    thrust_dir = self.spaceship.velocity.normalize()
+                else:
+                    thrust_dir = Vector2D(1, 0)  # Default direction if not moving
+                self.spaceship.use_thruster(thrust_dir, 30)
+        
+        elif key == pygame.K_LSHIFT or key == pygame.K_RSHIFT:
+            # Use brake/slowdown (if spaceship is flying)
+            if self.state == GameState.FLYING and self.spaceship.fuel > 0:
+                # Apply reverse thrust to slow down
+                if self.spaceship.velocity.magnitude() > 0:
+                    brake_dir = self.spaceship.velocity.normalize() * -1  # Opposite direction
+                    self.spaceship.use_thruster(brake_dir, 25)  # Slightly less force than forward thrust
         
         elif key == pygame.K_ESCAPE:
             self.running = False
@@ -117,24 +133,34 @@ class GameEngine:
     def handle_mouse_down(self):
         """Handle mouse button down"""
         if self.state == GameState.AIMING:
-            self.mouse_pressed = True
-            self.aim_start = Vector2D(self.mouse_pos.x, self.mouse_pos.y)
+            # Check if mouse is near the spaceship to start aiming
+            mouse_to_ship = self.mouse_pos - self.spaceship.position
+            if mouse_to_ship.magnitude() < 50:  # Start aiming if close to spaceship
+                self.aiming_active = True
+                self.mouse_pressed = True
+                self.slingshot_base = Vector2D(self.spaceship.position.x, self.spaceship.position.y)
     
     def handle_mouse_up(self):
         """Handle mouse button up"""
-        if self.state == GameState.AIMING and self.mouse_pressed:
+        if self.state == GameState.AIMING and self.aiming_active:
+            self.aiming_active = False
             self.mouse_pressed = False
             self.launch_spaceship()
     
     def launch_spaceship(self):
-        """Launch the spaceship with calculated velocity"""
+        """Launch the spaceship with calculated velocity from slingshot"""
         if self.spaceship and not self.spaceship.launched:
-            # Calculate launch velocity based on mouse drag
-            aim_vector = self.aim_start - self.spaceship.position
-            power_factor = min(aim_vector.magnitude() / 100.0, 3.0)  # Cap the power
+            # Calculate launch velocity based on slingshot pull
+            slingshot_vector = self.slingshot_base - self.mouse_pos
+            slingshot_distance = min(slingshot_vector.magnitude(), self.max_slingshot_distance)
             
-            if power_factor > 0.1:  # Minimum power threshold
-                launch_velocity = aim_vector.normalize() * power_factor * 100
+            if slingshot_distance > 10:  # Minimum pull threshold
+                # Launch direction is opposite to pull direction
+                launch_direction = slingshot_vector.normalize()
+                # Power based on how far back the slingshot is pulled
+                power_factor = slingshot_distance / self.max_slingshot_distance
+                launch_velocity = launch_direction * power_factor * 350  # Adjust base speed as needed
+                
                 self.spaceship.launch(launch_velocity)
                 self.state = GameState.FLYING
                 self.current_level.shots_used += 1
@@ -154,17 +180,28 @@ class GameEngine:
                     obj.update(dt)
     
     def update_aiming(self):
-        """Update aiming state"""
-        # Calculate aim direction and power for preview
-        if self.mouse_pressed and self.spaceship:
-            aim_vector = self.aim_start - self.spaceship.position
-            self.aim_power = min(aim_vector.magnitude() / 100.0, 3.0)
+        """Update aiming state with dynamic slingshot"""
+        if self.aiming_active and self.spaceship:
+            # Calculate slingshot vector and power
+            slingshot_vector = self.slingshot_base - self.mouse_pos
+            slingshot_distance = min(slingshot_vector.magnitude(), self.max_slingshot_distance)
+            
+            # Constrain mouse position to maximum slingshot distance
+            if slingshot_vector.magnitude() > self.max_slingshot_distance:
+                constrained_direction = slingshot_vector.normalize()
+                constrained_mouse_pos = self.slingshot_base - constrained_direction * self.max_slingshot_distance
+                self.mouse_pos = constrained_mouse_pos
             
             # Set spaceship velocity for trajectory prediction
-            if self.aim_power > 0.1:
-                self.spaceship.velocity = aim_vector.normalize() * self.aim_power * 100
+            if slingshot_distance > 10:
+                launch_direction = slingshot_vector.normalize()
+                power_factor = slingshot_distance / self.max_slingshot_distance
+                predicted_velocity = launch_direction * power_factor * 350
+                self.spaceship.velocity = predicted_velocity
+                self.aim_power = power_factor * 3.0  # For visual feedback
             else:
                 self.spaceship.velocity = Vector2D(0, 0)
+                self.aim_power = 0
     
     def update_flying(self, dt):
         """Update flying state"""
@@ -238,9 +275,9 @@ class GameEngine:
         if self.state == GameState.AIMING and self.spaceship and self.aim_power > 0.1:
             self.draw_trajectory_prediction()
         
-        # Draw aiming line
-        if self.state == GameState.AIMING and self.mouse_pressed:
-            self.draw_aiming_line()
+        # Draw slingshot when aiming
+        if self.state == GameState.AIMING and self.aiming_active:
+            self.draw_slingshot()
         
         # Draw UI
         self.draw_ui()
@@ -278,34 +315,69 @@ class GameEngine:
                 size = max(1, int(4 * progress))
                 pygame.draw.circle(self.screen, color, (int(point[0]), int(point[1])), size)
     
-    def draw_aiming_line(self):
-        """Draw enhanced aiming line and power indicator"""
-        if self.spaceship:
-            # Draw line from spaceship to mouse with gradient
-            pygame.draw.line(self.screen, (255, 255, 100),
-                           self.spaceship.position.to_tuple(),
-                           self.aim_start.to_tuple(), 4)
+    def draw_slingshot(self):
+        """Draw the slingshot aiming mechanism like Angry Birds"""
+        if not self.spaceship or not self.aiming_active:
+            return
+        
+        # Calculate slingshot vectors
+        slingshot_vector = self.slingshot_base - self.mouse_pos
+        slingshot_distance = min(slingshot_vector.magnitude(), self.max_slingshot_distance)
+        
+        if slingshot_distance > 5:
+            # Draw slingshot bands (two lines from base to current mouse position)
+            band_offset = 8  # Offset for the two slingshot bands
+            perpendicular = Vector2D(-slingshot_vector.y, slingshot_vector.x).normalize() * band_offset
             
-            # Draw power indicator with cool effects
-            power_length = self.aim_power * 60
-            if power_length > 5:
-                end_pos = self.spaceship.position + (self.aim_start - self.spaceship.position).normalize() * power_length
-                
-                # Power bar with color based on strength
-                if self.aim_power < 1.0:
-                    power_color = (0, 255, 100)  # Green for low power
-                elif self.aim_power < 2.0:
-                    power_color = (255, 200, 0)  # Yellow for medium power
-                else:
-                    power_color = (255, 50, 50)  # Red for high power
-                
-                pygame.draw.line(self.screen, power_color,
-                               self.spaceship.position.to_tuple(),
-                               end_pos.to_tuple(), 6)
-                
-                # Draw power level indicator
-                pygame.draw.circle(self.screen, (255, 255, 255),
-                                 (int(end_pos.x), int(end_pos.y)), 4)
+            # Left band
+            left_anchor = self.slingshot_base + perpendicular
+            pygame.draw.line(self.screen, (139, 69, 19),  # Brown color for slingshot
+                           left_anchor.to_tuple(),
+                           self.mouse_pos.to_tuple(), 4)
+            
+            # Right band
+            right_anchor = self.slingshot_base - perpendicular
+            pygame.draw.line(self.screen, (139, 69, 19),
+                           right_anchor.to_tuple(),
+                           self.mouse_pos.to_tuple(), 4)
+            
+            # Draw power indicator with color based on strength
+            power_ratio = slingshot_distance / self.max_slingshot_distance
+            if power_ratio < 0.3:
+                power_color = (0, 255, 100)  # Green for low power
+            elif power_ratio < 0.7:
+                power_color = (255, 200, 0)  # Yellow for medium power
+            else:
+                power_color = (255, 50, 50)  # Red for high power
+            
+            # Draw aiming line showing launch direction
+            launch_direction = slingshot_vector.normalize()
+            aim_end = self.slingshot_base + launch_direction * 60
+            pygame.draw.line(self.screen, power_color,
+                           self.slingshot_base.to_tuple(),
+                           aim_end.to_tuple(), 3)
+            
+            # Draw arrow head
+            pygame.draw.circle(self.screen, power_color,
+                             (int(aim_end.x), int(aim_end.y)), 4)
+            
+            # Draw pull-back indicator at mouse position
+            pygame.draw.circle(self.screen, (255, 255, 255),
+                             (int(self.mouse_pos.x), int(self.mouse_pos.y)), 6, 2)
+            
+            # Draw power meter
+            power_bar_length = int(power_ratio * 50)
+            power_bar_start = self.slingshot_base + Vector2D(20, -10)
+            power_bar_end = power_bar_start + Vector2D(power_bar_length, 0)
+            
+            # Background of power meter
+            pygame.draw.rect(self.screen, (50, 50, 50),
+                           (power_bar_start.x, power_bar_start.y, 50, 8))
+            
+            # Power meter fill
+            if power_bar_length > 0:
+                pygame.draw.rect(self.screen, power_color,
+                               (power_bar_start.x, power_bar_start.y, power_bar_length, 8))
     
     def draw_ui(self):
         """Draw enhanced user interface with cool colors"""
@@ -368,8 +440,13 @@ class GameEngine:
             msg_surface = self.small_font.render(msg, True, (255, 255, 150))
             self.screen.blit(msg_surface, (10, self.screen_height - 30))
         
+        elif self.state == GameState.FLYING:
+            msg = ">> Spaceship is flying! SPACE=Boost | SHIFT=Brake <<"
+            msg_surface = self.small_font.render(msg, True, (255, 255, 100))
+            self.screen.blit(msg_surface, (10, self.screen_height - 30))
+        
         # Controls help with better formatting
-        help_text = "Controls: R=Restart | N=Next | P=Previous | SPACE=Thruster | ESC=Quit"
+        help_text = "Controls: R=Restart | N=Next | P=Previous | SPACE=Thruster | SHIFT=Brake | DRAG=Aim & Launch | ESC=Quit"
         help_surface = self.small_font.render(help_text, True, (180, 180, 255))
         self.screen.blit(help_surface, (10, self.screen_height - 60))
     

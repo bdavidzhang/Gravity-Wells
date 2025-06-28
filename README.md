@@ -9,18 +9,22 @@ In Gravity Wells, you control a spaceship that must reach the goal by using the 
 ## 🎮 How to Play
 
 ### Controls
-- **Mouse**: Click and drag from the spaceship to aim and set power
-- **SPACE**: Use thruster for small course corrections (consumes fuel)
+- **Mouse**: Click and drag from the spaceship to aim and set power (Angry Birds style)
+- **Mouse (Aiming)**: Drag to dynamically adjust slingshot direction and power before launch
+- **SPACE**: Use thruster for speed boost while flying (consumes fuel)
+- **SHIFT**: Use brake to slow down while flying (consumes fuel)
 - **R**: Restart current level
 - **N**: Next level (when level is complete)
 - **P**: Previous level
 - **ESC**: Quit game
 
 ### Gameplay
-1. **Aim**: Click and drag from your spaceship to set launch direction and power
-2. **Launch**: Release the mouse button to launch your spaceship
-3. **Navigate**: Use gravitational forces to slingshot around planets
-4. **Reach Goal**: Hit the pulsing green goal to complete the level
+1. **Aim**: Click near your spaceship and drag to pull back the slingshot (like Angry Birds)
+2. **Adjust**: Move your mouse to dynamically adjust direction and power
+3. **Launch**: Release the mouse button to launch your spaceship
+4. **Control**: Use SPACE to boost forward or SHIFT to brake/slow down
+5. **Navigate**: Use gravitational forces to slingshot around planets
+6. **Reach Goal**: Hit the pulsing green goal to complete the level
 
 ### Game Elements
 
