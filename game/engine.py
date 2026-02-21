@@ -86,6 +86,9 @@ class GameEngine:
         # v2.0: Level select hover
         self.level_select_hover = -1
 
+        # v2.0: Held keys for continuous thrust/brake
+        self.keys_held = set()
+
         # v2.0: Transition timer for smooth state changes
         self.transition_timer = 0
 
@@ -120,7 +123,11 @@ class GameEngine:
                 self.running = False
 
             elif event.type == pygame.KEYDOWN:
+                self.keys_held.add(event.key)
                 self.handle_key_press(event.key)
+
+            elif event.type == pygame.KEYUP:
+                self.keys_held.discard(event.key)
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
@@ -150,20 +157,6 @@ class GameEngine:
                 if self.level_manager.can_go_to_previous_level():
                     if self.level_manager.previous_level():
                         self.load_current_level()
-
-        elif key == pygame.K_SPACE:
-            if self.state == GameState.FLYING and self.spaceship and self.spaceship.fuel > 0:
-                if self.spaceship.velocity.magnitude() > 0:
-                    thrust_dir = self.spaceship.velocity.normalize()
-                else:
-                    thrust_dir = Vector2D(1, 0)
-                self.spaceship.use_thruster(thrust_dir, 30)
-
-        elif key == pygame.K_LSHIFT or key == pygame.K_RSHIFT:
-            if self.state == GameState.FLYING and self.spaceship and self.spaceship.fuel > 0:
-                if self.spaceship.velocity.magnitude() > 0:
-                    brake_dir = self.spaceship.velocity.normalize() * -1
-                    self.spaceship.use_thruster(brake_dir, 25)
 
         elif key == pygame.K_m:
             # v2.0: Toggle level select screen
@@ -328,19 +321,35 @@ class GameEngine:
             # Update spaceship
             self.spaceship.update(effective_dt)
 
+            # Continuous thrust/brake while keys are held
+            if self.spaceship.fuel > 0:
+                if pygame.K_SPACE in self.keys_held:
+                    if self.spaceship.velocity.magnitude() > 0:
+                        thrust_dir = self.spaceship.velocity.normalize()
+                    else:
+                        thrust_dir = Vector2D(1, 0)
+                    self.spaceship.use_thruster(thrust_dir, 30 * effective_dt * 10)
+                if pygame.K_LSHIFT in self.keys_held or pygame.K_RSHIFT in self.keys_held:
+                    if self.spaceship.velocity.magnitude() > 0:
+                        brake_dir = self.spaceship.velocity.normalize() * -1
+                        self.spaceship.use_thruster(brake_dir, 25 * effective_dt * 10)
+
             # v2.0: Check wormhole collisions
             self.check_wormhole_collisions()
 
             # Check collisions
             self.check_collisions()
 
-            # Check if spaceship is off screen
-            if (self.spaceship.position.x < -100 or
-                self.spaceship.position.x > self.screen_width + 100 or
-                self.spaceship.position.y < -100 or
-                self.spaceship.position.y > self.screen_height + 100):
-                self.spawn_explosion(self.spaceship.position.x, self.spaceship.position.y)
-                self.reset_for_next_shot()
+            # Screen wrapping: ship reappears on the opposite side
+            margin = 20
+            if self.spaceship.position.x < -margin:
+                self.spaceship.position.x = self.screen_width + margin
+            elif self.spaceship.position.x > self.screen_width + margin:
+                self.spaceship.position.x = -margin
+            if self.spaceship.position.y < -margin:
+                self.spaceship.position.y = self.screen_height + margin
+            elif self.spaceship.position.y > self.screen_height + margin:
+                self.spaceship.position.y = -margin
 
     def check_wormhole_collisions(self):
         """v2.0: Check if spaceship enters a wormhole"""
@@ -477,6 +486,70 @@ class GameEngine:
             text.set_alpha(alpha_text)
             rect = text.get_rect(center=(self.screen_width // 2, 50))
             self.screen.blit(text, rect)
+
+    def draw_thrust_hud(self):
+        """Draw boost/brake indicators during flight"""
+        if not self.spaceship:
+            return
+
+        boosting = pygame.K_SPACE in self.keys_held and self.spaceship.fuel > 0
+        braking = (pygame.K_LSHIFT in self.keys_held or pygame.K_RSHIFT in self.keys_held) and self.spaceship.fuel > 0
+        has_fuel = self.spaceship.fuel > 0
+
+        hud_x = self.screen_width - 220
+        hud_y = self.screen_height - 90
+
+        # Background panel
+        panel = pygame.Rect(hud_x - 10, hud_y - 8, 220, 75)
+        panel_surface = pygame.Surface((panel.width, panel.height), pygame.SRCALPHA)
+        panel_surface.fill((0, 0, 0, 120))
+        self.screen.blit(panel_surface, (panel.x, panel.y))
+        pygame.draw.rect(self.screen, (60, 60, 100), panel, 1)
+
+        # Fuel bar
+        fuel_ratio = self.spaceship.fuel / self.spaceship.max_fuel
+        bar_w = 200
+        bar_h = 10
+        fuel_color = (int(255 * (1 - fuel_ratio)), int(255 * fuel_ratio), 80)
+        pygame.draw.rect(self.screen, (30, 30, 40), (hud_x, hud_y, bar_w, bar_h))
+        pygame.draw.rect(self.screen, fuel_color, (hud_x, hud_y, int(bar_w * fuel_ratio), bar_h))
+        fuel_label = self.small_font.render(f"Fuel: {self.spaceship.fuel}", True, (200, 200, 200))
+        self.screen.blit(fuel_label, (hud_x, hud_y - 6))
+
+        # Boost indicator
+        boost_y = hud_y + 18
+        if boosting:
+            boost_color = (100, 255, 200)
+            boost_text = ">> BOOST [SPACE] <<"
+            # Active glow
+            pulse = abs(math.sin(time.time() * 8)) * 0.3 + 0.7
+            glow_color = (0, int(200 * pulse), int(100 * pulse))
+            pygame.draw.rect(self.screen, glow_color, (hud_x - 2, boost_y, 104, 18), 1)
+        elif has_fuel:
+            boost_color = (120, 180, 150)
+            boost_text = "   BOOST [SPACE]"
+        else:
+            boost_color = (80, 80, 80)
+            boost_text = "   BOOST [NO FUEL]"
+        boost_surface = self.small_font.render(boost_text, True, boost_color)
+        self.screen.blit(boost_surface, (hud_x, boost_y))
+
+        # Brake indicator
+        brake_y = hud_y + 38
+        if braking:
+            brake_color = (255, 150, 100)
+            brake_text = ">> BRAKE [SHIFT] <<"
+            pulse = abs(math.sin(time.time() * 8)) * 0.3 + 0.7
+            glow_color = (int(200 * pulse), int(80 * pulse), 0)
+            pygame.draw.rect(self.screen, glow_color, (hud_x - 2, brake_y, 104, 18), 1)
+        elif has_fuel:
+            brake_color = (180, 140, 120)
+            brake_text = "   BRAKE [SHIFT]"
+        else:
+            brake_color = (80, 80, 80)
+            brake_text = "   BRAKE [NO FUEL]"
+        brake_surface = self.small_font.render(brake_text, True, brake_color)
+        self.screen.blit(brake_surface, (hud_x, brake_y))
 
     def draw_trajectory_prediction(self):
         """Draw predicted trajectory with enhanced visual effects"""
@@ -675,9 +748,7 @@ class GameEngine:
             self.screen.blit(msg_surface, (10, self.screen_height - 30))
 
         elif self.state == GameState.FLYING:
-            msg = ">> Flying! SPACE=Boost | SHIFT=Brake <<"
-            msg_surface = self.small_font.render(msg, True, (255, 255, 100))
-            self.screen.blit(msg_surface, (10, self.screen_height - 30))
+            self.draw_thrust_hud()
 
         # Navigation controls
         progress = self.level_manager.get_level_progress()
