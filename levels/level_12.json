@@ -1,0 +1,67 @@
+{
+  "name": "The Ultimate v2.0 Challenge",
+  "description": "All mechanics combined! Wormholes, black holes, anti-gravity... good luck!",
+  "max_shots": 4,
+  "spaceship_start": {"x": 60, "y": 650},
+  "objects": [
+    {
+      "type": "planet",
+      "x": 200,
+      "y": 500,
+      "mass": 90,
+      "radius": 28,
+      "color": [200, 50, 200]
+    },
+    {
+      "type": "black_hole",
+      "x": 400,
+      "y": 400,
+      "mass": 350
+    },
+    {
+      "type": "wormhole",
+      "x": 150,
+      "y": 300,
+      "partner_x": 700,
+      "partner_y": 450
+    },
+    {
+      "type": "wormhole",
+      "x": 700,
+      "y": 450,
+      "partner_x": 150,
+      "partner_y": 300
+    },
+    {
+      "type": "anti_gravity",
+      "x": 550,
+      "y": 250,
+      "mass": 80
+    },
+    {
+      "type": "obstacle",
+      "x": 300,
+      "y": 250,
+      "radius": 20
+    },
+    {
+      "type": "obstacle",
+      "x": 600,
+      "y": 150,
+      "radius": 15
+    },
+    {
+      "type": "planet",
+      "x": 800,
+      "y": 300,
+      "mass": 80,
+      "radius": 24,
+      "color": [50, 255, 50]
+    },
+    {
+      "type": "goal",
+      "x": 920,
+      "y": 100
+    }
+  ]
+}

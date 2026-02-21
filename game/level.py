@@ -1,5 +1,6 @@
 """
 Level management and loading system
+Gravity Wells v2.0
 """
 
 import json
@@ -9,80 +10,99 @@ from game.physics import Vector2D
 
 class Level:
     """Represents a single game level"""
-    
+
     def __init__(self, level_data=None):
         self.spaceship_start = Vector2D(100, 300)
         self.objects = []
         self.gravity_sources = []
+        self.wormholes = []  # v2.0: Wormhole pairs
         self.goal = None
         self.name = "Untitled Level"
         self.description = "Complete the level by reaching the goal!"
         self.max_shots = 3
         self.shots_used = 0
-        
+
         if level_data:
             self.load_from_data(level_data)
-    
+
     def load_from_data(self, data):
         """Load level from dictionary data"""
         self.name = data.get("name", "Untitled Level")
         self.description = data.get("description", "")
         self.max_shots = data.get("max_shots", 3)
-        
+
         # Load spaceship starting position
         start_pos = data.get("spaceship_start", {"x": 100, "y": 300})
         self.spaceship_start = Vector2D(start_pos["x"], start_pos["y"])
-        
+
         # Load objects
         self.objects = []
         self.gravity_sources = []
-        
+        self.wormholes = []
+
+        # First pass: create all objects
+        wormhole_pairs = []  # Collect wormhole data for linking
         for obj_data in data.get("objects", []):
             obj = self.create_object_from_data(obj_data)
             if obj:
                 self.objects.append(obj)
-                
+
                 # Add to gravity sources if it has gravitational effect
                 if hasattr(obj, 'mass') and obj.mass > 0:
                     self.gravity_sources.append(obj)
-                
+
                 # Set goal reference
                 if isinstance(obj, Goal):
                     self.goal = obj
-    
+
+                # Track wormholes for linking
+                if isinstance(obj, Wormhole):
+                    self.wormholes.append(obj)
+                    wormhole_pairs.append(obj)
+
+        # Link wormhole pairs
+        for i in range(0, len(wormhole_pairs) - 1, 2):
+            wormhole_pairs[i].link_partner(wormhole_pairs[i + 1])
+            wormhole_pairs[i + 1].link_partner(wormhole_pairs[i])
+
     def create_object_from_data(self, obj_data):
         """Create game object from data dictionary"""
         obj_type = obj_data.get("type")
         x = obj_data.get("x", 0)
         y = obj_data.get("y", 0)
-        
+
         if obj_type == "planet":
             mass = obj_data.get("mass", 100)
             radius = obj_data.get("radius", 30)
             color = obj_data.get("color", [100, 100, 200])
             return Planet(x, y, mass, radius, tuple(color))
-        
+
         elif obj_type == "black_hole":
             mass = obj_data.get("mass", 200)
             return BlackHole(x, y, mass)
-        
+
         elif obj_type == "anti_gravity":
             mass = obj_data.get("mass", 50)
             return AntiGravityWell(x, y, mass)
-        
+
         elif obj_type == "goal":
             return Goal(x, y)
-        
+
         elif obj_type == "obstacle":
             radius = obj_data.get("radius", 15)
             return Obstacle(x, y, radius)
-        
+
+        elif obj_type == "wormhole":
+            partner_x = obj_data.get("partner_x", 0)
+            partner_y = obj_data.get("partner_y", 0)
+            return Wormhole(x, y, partner_x, partner_y)
+
         return None
-    
+
     def reset(self):
         """Reset level state"""
         self.shots_used = 0
-        
+
         # Reset all objects to initial state
         for obj in self.objects:
             if hasattr(obj, 'active'):
@@ -90,27 +110,26 @@ class Level:
 
 class LevelManager:
     """Manages level loading and progression"""
-    
+
     def __init__(self):
         self.levels = []
         self.current_level_index = 0
         self.levels_dir = "levels"
         self.progress_file = "progress.json"
-        self.completed_levels = set()  # Set of completed level indices
-        self.unlocked_levels = {0}  # Set of unlocked level indices (level 0 always unlocked)
-        
+        self.completed_levels = set()
+        self.unlocked_levels = {0}
+        self.level_stars = {}  # v2.0: stars earned per level {index: stars}
+
         self.load_progress()
         self.load_all_levels()
         self.update_unlocked_levels()
-    
+
     def load_all_levels(self):
         """Load all available levels"""
-        # Create default levels if no level files exist
         if not os.path.exists(self.levels_dir):
             os.makedirs(self.levels_dir)
             self.create_default_levels()
-        
-        # Load levels from files
+
         self.levels = []
         for filename in sorted(os.listdir(self.levels_dir)):
             if filename.endswith('.json'):
@@ -122,11 +141,10 @@ class LevelManager:
                         self.levels.append(level)
                 except Exception as e:
                     print(f"Error loading level {filename}: {e}")
-        
-        # Ensure we have at least one level
+
         if not self.levels:
             self.levels.append(self.create_tutorial_level())
-    
+
     def load_progress(self):
         """Load player progress from file"""
         if os.path.exists(self.progress_file):
@@ -135,50 +153,90 @@ class LevelManager:
                     data = json.load(f)
                     self.completed_levels = set(data.get("completed_levels", []))
                     self.current_level_index = data.get("current_level_index", 0)
+                    # v2.0: Load star ratings
+                    stars_data = data.get("level_stars", {})
+                    self.level_stars = {int(k): v for k, v in stars_data.items()}
             except Exception as e:
                 print(f"Error loading progress: {e}")
                 self.completed_levels = set()
                 self.current_level_index = 0
-    
+
     def save_progress(self):
         """Save player progress to file"""
         try:
             data = {
                 "completed_levels": list(self.completed_levels),
-                "current_level_index": self.current_level_index
+                "current_level_index": self.current_level_index,
+                "level_stars": {str(k): v for k, v in self.level_stars.items()}
             }
             with open(self.progress_file, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
             print(f"Error saving progress: {e}")
-    
+
     def update_unlocked_levels(self):
         """Update which levels are unlocked based on completed levels"""
-        self.unlocked_levels = {0}  # First level always unlocked
-        
-        # Unlock next level for each completed level
+        self.unlocked_levels = {0}
         for completed_idx in self.completed_levels:
             next_level_idx = completed_idx + 1
             if next_level_idx < len(self.levels):
                 self.unlocked_levels.add(next_level_idx)
-    
-    def complete_level(self, level_index):
-        """Mark a level as completed"""
+
+    def complete_level(self, level_index, shots_used=0, max_shots=0):
+        """Mark a level as completed and calculate stars"""
         if 0 <= level_index < len(self.levels):
             self.completed_levels.add(level_index)
+
+            # v2.0: Calculate star rating
+            if max_shots > 0:
+                shots_ratio = shots_used / max_shots
+                if shots_ratio <= 0.34:
+                    stars = 3  # Used 1/3 or less of shots
+                elif shots_ratio <= 0.67:
+                    stars = 2  # Used 2/3 or less
+                else:
+                    stars = 1  # Used most shots
+            else:
+                stars = 1
+
+            # Keep best star rating
+            current_stars = self.level_stars.get(level_index, 0)
+            if stars > current_stars:
+                self.level_stars[level_index] = stars
+
             self.update_unlocked_levels()
             self.save_progress()
-            return True
-        return False
-    
+            return stars
+        return 0
+
+    def get_level_stars(self, level_index):
+        """Get star rating for a level"""
+        return self.level_stars.get(level_index, 0)
+
+    def get_total_stars(self):
+        """Get total stars earned across all levels"""
+        return sum(self.level_stars.values())
+
+    def get_max_possible_stars(self):
+        """Get maximum possible stars"""
+        return len(self.levels) * 3
+
     def is_level_unlocked(self, level_index):
         """Check if a level is unlocked"""
         return level_index in self.unlocked_levels
-    
+
     def is_level_completed(self, level_index):
         """Check if a level is completed"""
         return level_index in self.completed_levels
-    
+
+    def go_to_level(self, level_index):
+        """Jump to a specific level (if unlocked)"""
+        if 0 <= level_index < len(self.levels) and self.is_level_unlocked(level_index):
+            self.current_level_index = level_index
+            self.save_progress()
+            return True
+        return False
+
     def create_default_levels(self):
         """Create default level files with enhanced variety and all object types"""
         levels_data = [
@@ -194,7 +252,7 @@ class LevelManager:
                         "y": 300,
                         "mass": 80,
                         "radius": 25,
-                        "color": [50, 50, 255]  # Blue - Normal gravity
+                        "color": [50, 50, 255]
                     },
                     {
                         "type": "goal",
@@ -215,7 +273,7 @@ class LevelManager:
                         "y": 300,
                         "mass": 100,
                         "radius": 35,
-                        "color": [255, 30, 30]  # Red - Heavy gravity (2x)
+                        "color": [255, 30, 30]
                     },
                     {
                         "type": "goal",
@@ -248,7 +306,7 @@ class LevelManager:
                         "y": 350,
                         "mass": 80,
                         "radius": 25,
-                        "color": [50, 255, 50]  # Green - Light gravity
+                        "color": [50, 255, 50]
                     },
                     {
                         "type": "goal",
@@ -275,7 +333,7 @@ class LevelManager:
                         "y": 200,
                         "mass": 60,
                         "radius": 20,
-                        "color": [50, 255, 50]  # Green - Light gravity helper
+                        "color": [50, 255, 50]
                     },
                     {
                         "type": "goal",
@@ -296,7 +354,7 @@ class LevelManager:
                         "y": 150,
                         "mass": 80,
                         "radius": 28,
-                        "color": [200, 50, 200]  # Purple - Super heavy (2.5x)
+                        "color": [200, 50, 200]
                     },
                     {
                         "type": "planet",
@@ -304,7 +362,7 @@ class LevelManager:
                         "y": 400,
                         "mass": 90,
                         "radius": 30,
-                        "color": [255, 255, 50]  # Yellow - Variable (1.5x)
+                        "color": [255, 255, 50]
                     },
                     {
                         "type": "planet",
@@ -312,7 +370,7 @@ class LevelManager:
                         "y": 200,
                         "mass": 100,
                         "radius": 25,
-                        "color": [50, 255, 50]  # Green - Light (0.7x)
+                        "color": [50, 255, 50]
                     },
                     {
                         "type": "obstacle",
@@ -357,7 +415,7 @@ class LevelManager:
                         "y": 500,
                         "mass": 100,
                         "radius": 30,
-                        "color": [50, 50, 255]  # Blue - Normal gravity
+                        "color": [50, 50, 255]
                     },
                     {
                         "type": "anti_gravity",
@@ -390,7 +448,7 @@ class LevelManager:
                         "y": 300,
                         "mass": 120,
                         "radius": 35,
-                        "color": [255, 30, 30]  # Red - Heavy gravity
+                        "color": [255, 30, 30]
                     },
                     {
                         "type": "anti_gravity",
@@ -404,7 +462,7 @@ class LevelManager:
                         "y": 450,
                         "mass": 90,
                         "radius": 25,
-                        "color": [255, 255, 50]  # Yellow - Variable gravity
+                        "color": [255, 255, 50]
                     },
                     {
                         "type": "obstacle",
@@ -443,7 +501,7 @@ class LevelManager:
                         "y": 250,
                         "mass": 60,
                         "radius": 20,
-                        "color": [50, 255, 50]  # Green - Light gravity escape helper
+                        "color": [50, 255, 50]
                     },
                     {
                         "type": "anti_gravity",
@@ -470,7 +528,7 @@ class LevelManager:
                         "y": 400,
                         "mass": 100,
                         "radius": 30,
-                        "color": [200, 50, 200]  # Purple - Super heavy
+                        "color": [200, 50, 200]
                     },
                     {
                         "type": "obstacle",
@@ -496,7 +554,7 @@ class LevelManager:
                         "y": 500,
                         "mass": 70,
                         "radius": 22,
-                        "color": [50, 255, 50]  # Green - Light gravity
+                        "color": [50, 255, 50]
                     },
                     {
                         "type": "obstacle",
@@ -510,7 +568,7 @@ class LevelManager:
                         "y": 400,
                         "mass": 90,
                         "radius": 28,
-                        "color": [255, 30, 30]  # Red - Heavy gravity
+                        "color": [255, 30, 30]
                     },
                     {
                         "type": "anti_gravity",
@@ -524,15 +582,188 @@ class LevelManager:
                         "y": 300
                     }
                 ]
+            },
+            {
+                "name": "Wormhole Discovery",
+                "description": "NEW v2.0! Blue portals teleport your ship. Use them wisely!",
+                "max_shots": 3,
+                "spaceship_start": {"x": 100, "y": 400},
+                "objects": [
+                    {
+                        "type": "obstacle",
+                        "x": 350,
+                        "y": 400,
+                        "radius": 25
+                    },
+                    {
+                        "type": "obstacle",
+                        "x": 350,
+                        "y": 300,
+                        "radius": 25
+                    },
+                    {
+                        "type": "obstacle",
+                        "x": 350,
+                        "y": 200,
+                        "radius": 25
+                    },
+                    {
+                        "type": "wormhole",
+                        "x": 250,
+                        "y": 500,
+                        "partner_x": 500,
+                        "partner_y": 200
+                    },
+                    {
+                        "type": "wormhole",
+                        "x": 500,
+                        "y": 200,
+                        "partner_x": 250,
+                        "partner_y": 500
+                    },
+                    {
+                        "type": "planet",
+                        "x": 650,
+                        "y": 300,
+                        "mass": 70,
+                        "radius": 22,
+                        "color": [50, 50, 255]
+                    },
+                    {
+                        "type": "goal",
+                        "x": 850,
+                        "y": 250
+                    }
+                ]
+            },
+            {
+                "name": "Wormhole Gravity Gauntlet",
+                "description": "Combine wormholes with gravity slingshots to navigate this deadly course!",
+                "max_shots": 3,
+                "spaceship_start": {"x": 80, "y": 600},
+                "objects": [
+                    {
+                        "type": "black_hole",
+                        "x": 300,
+                        "y": 400,
+                        "mass": 300
+                    },
+                    {
+                        "type": "wormhole",
+                        "x": 180,
+                        "y": 250,
+                        "partner_x": 650,
+                        "partner_y": 500
+                    },
+                    {
+                        "type": "wormhole",
+                        "x": 650,
+                        "y": 500,
+                        "partner_x": 180,
+                        "partner_y": 250
+                    },
+                    {
+                        "type": "anti_gravity",
+                        "x": 500,
+                        "y": 300,
+                        "mass": 70
+                    },
+                    {
+                        "type": "planet",
+                        "x": 750,
+                        "y": 250,
+                        "mass": 80,
+                        "radius": 25,
+                        "color": [255, 30, 30]
+                    },
+                    {
+                        "type": "obstacle",
+                        "x": 850,
+                        "y": 350,
+                        "radius": 18
+                    },
+                    {
+                        "type": "goal",
+                        "x": 900,
+                        "y": 150
+                    }
+                ]
+            },
+            {
+                "name": "The Ultimate v2.0 Challenge",
+                "description": "All mechanics combined! Wormholes, black holes, anti-gravity... good luck!",
+                "max_shots": 4,
+                "spaceship_start": {"x": 60, "y": 650},
+                "objects": [
+                    {
+                        "type": "planet",
+                        "x": 200,
+                        "y": 500,
+                        "mass": 90,
+                        "radius": 28,
+                        "color": [200, 50, 200]
+                    },
+                    {
+                        "type": "black_hole",
+                        "x": 400,
+                        "y": 400,
+                        "mass": 350
+                    },
+                    {
+                        "type": "wormhole",
+                        "x": 150,
+                        "y": 300,
+                        "partner_x": 700,
+                        "partner_y": 450
+                    },
+                    {
+                        "type": "wormhole",
+                        "x": 700,
+                        "y": 450,
+                        "partner_x": 150,
+                        "partner_y": 300
+                    },
+                    {
+                        "type": "anti_gravity",
+                        "x": 550,
+                        "y": 250,
+                        "mass": 80
+                    },
+                    {
+                        "type": "obstacle",
+                        "x": 300,
+                        "y": 250,
+                        "radius": 20
+                    },
+                    {
+                        "type": "obstacle",
+                        "x": 600,
+                        "y": 150,
+                        "radius": 15
+                    },
+                    {
+                        "type": "planet",
+                        "x": 800,
+                        "y": 300,
+                        "mass": 80,
+                        "radius": 24,
+                        "color": [50, 255, 50]
+                    },
+                    {
+                        "type": "goal",
+                        "x": 920,
+                        "y": 100
+                    }
+                ]
             }
         ]
-        
+
         for i, level_data in enumerate(levels_data):
             filename = f"level_{i+1:02d}.json"
             filepath = os.path.join(self.levels_dir, filename)
             with open(filepath, 'w') as f:
                 json.dump(level_data, f, indent=2)
-    
+
     def create_tutorial_level(self):
         """Create a simple tutorial level"""
         return Level({
@@ -555,13 +786,13 @@ class LevelManager:
                 }
             ]
         })
-    
+
     def get_current_level(self):
         """Get the current level"""
         if 0 <= self.current_level_index < len(self.levels):
             return self.levels[self.current_level_index]
         return None
-    
+
     def next_level(self):
         """Advance to next level (only if unlocked)"""
         next_index = self.current_level_index + 1
@@ -570,7 +801,7 @@ class LevelManager:
             self.save_progress()
             return True
         return False
-    
+
     def previous_level(self):
         """Go to previous level (only if unlocked)"""
         prev_index = self.current_level_index - 1
@@ -579,23 +810,23 @@ class LevelManager:
             self.save_progress()
             return True
         return False
-    
+
     def can_go_to_next_level(self):
         """Check if player can advance to next level"""
         next_index = self.current_level_index + 1
         return next_index < len(self.levels) and self.is_level_unlocked(next_index)
-    
+
     def can_go_to_previous_level(self):
         """Check if player can go to previous level"""
         prev_index = self.current_level_index - 1
         return prev_index >= 0 and self.is_level_unlocked(prev_index)
-    
+
     def restart_level(self):
         """Restart current level"""
         current_level = self.get_current_level()
         if current_level:
             current_level.reset()
-    
+
     def get_level_progress(self):
         """Get current level progress info"""
         return {
@@ -606,5 +837,8 @@ class LevelManager:
             "can_go_next": self.can_go_to_next_level(),
             "can_go_previous": self.can_go_to_previous_level(),
             "completed_count": len(self.completed_levels),
-            "unlocked_count": len(self.unlocked_levels)
+            "unlocked_count": len(self.unlocked_levels),
+            "total_stars": self.get_total_stars(),
+            "max_stars": self.get_max_possible_stars(),
+            "current_stars": self.get_level_stars(self.current_level_index)
         }
