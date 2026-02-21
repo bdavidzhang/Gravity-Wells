@@ -1,0 +1,53 @@
+{
+  "name": "Wormhole Gravity Gauntlet",
+  "description": "Combine wormholes with gravity slingshots to navigate this deadly course!",
+  "max_shots": 3,
+  "spaceship_start": {"x": 80, "y": 600},
+  "objects": [
+    {
+      "type": "black_hole",
+      "x": 300,
+      "y": 400,
+      "mass": 300
+    },
+    {
+      "type": "wormhole",
+      "x": 180,
+      "y": 250,
+      "partner_x": 650,
+      "partner_y": 500
+    },
+    {
+      "type": "wormhole",
+      "x": 650,
+      "y": 500,
+      "partner_x": 180,
+      "partner_y": 250
+    },
+    {
+      "type": "anti_gravity",
+      "x": 500,
+      "y": 300,
+      "mass": 70
+    },
+    {
+      "type": "planet",
+      "x": 750,
+      "y": 250,
+      "mass": 80,
+      "radius": 25,
+      "color": [255, 30, 30]
+    },
+    {
+      "type": "obstacle",
+      "x": 850,
+      "y": 350,
+      "radius": 18
+    },
+    {
+      "type": "goal",
+      "x": 900,
+      "y": 150
+    }
+  ]
+}

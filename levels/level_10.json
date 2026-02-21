@@ -1,0 +1,53 @@
+{
+  "name": "Wormhole Discovery",
+  "description": "NEW v2.0! Blue portals teleport your ship. Use them wisely!",
+  "max_shots": 3,
+  "spaceship_start": {"x": 100, "y": 400},
+  "objects": [
+    {
+      "type": "obstacle",
+      "x": 350,
+      "y": 400,
+      "radius": 25
+    },
+    {
+      "type": "obstacle",
+      "x": 350,
+      "y": 300,
+      "radius": 25
+    },
+    {
+      "type": "obstacle",
+      "x": 350,
+      "y": 200,
+      "radius": 25
+    },
+    {
+      "type": "wormhole",
+      "x": 250,
+      "y": 500,
+      "partner_x": 500,
+      "partner_y": 200
+    },
+    {
+      "type": "wormhole",
+      "x": 500,
+      "y": 200,
+      "partner_x": 250,
+      "partner_y": 500
+    },
+    {
+      "type": "planet",
+      "x": 650,
+      "y": 300,
+      "mass": 70,
+      "radius": 22,
+      "color": [50, 50, 255]
+    },
+    {
+      "type": "goal",
+      "x": 850,
+      "y": 250
+    }
+  ]
+}

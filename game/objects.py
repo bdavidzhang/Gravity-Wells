@@ -1,9 +1,12 @@
 """
-Game objects: spaceship, planets, goals, obstacles
+Game objects: spaceship, planets, goals, obstacles, wormholes
+Gravity Wells v2.0
 """
 
 import pygame
 import math
+import random
+import time
 from game.physics import Vector2D
 
 class GameObject:
@@ -174,7 +177,6 @@ class Planet(GameObject):
         num_rings = min(int(gravity_strength * 3), 6)  # More rings for stronger gravity
         
         # Animated pulsing effect
-        import time
         pulse = abs(math.sin(time.time() * 2)) * 0.3 + 0.7
         
         for i in range(num_rings):
@@ -231,7 +233,6 @@ class BlackHole(GameObject):
     
     def draw(self, screen):
         """Draw black hole with dramatic visual effects"""
-        import time
         
         # Draw accretion disk with spinning effect
         spin_offset = time.time() * 5
@@ -275,7 +276,6 @@ class AntiGravityWell(GameObject):
     
     def draw(self, screen):
         """Draw anti-gravity well with energy field effects"""
-        import time
         
         # Draw pulsing energy field
         pulse = abs(math.sin(time.time() * 4)) * 0.4 + 0.6
@@ -328,7 +328,6 @@ class Goal(GameObject):
         self.current_radius = int(self.radius * pulse)
         
         # Update particles
-        import random
         if random.random() < 0.3:  # Add new particles
             angle = random.uniform(0, 2 * math.pi)
             speed = random.uniform(10, 30)
@@ -350,7 +349,6 @@ class Goal(GameObject):
     
     def draw(self, screen):
         """Draw animated goal with particle effects"""
-        import time
         
         # Draw success particles
         for particle in self.particles:
@@ -390,7 +388,6 @@ class Obstacle(GameObject):
     
     def draw(self, screen):
         """Draw obstacle with warning effects"""
-        import time
         
         # Draw pulsing danger field
         pulse = abs(math.sin(time.time() * 5)) * 0.5 + 0.5
@@ -412,3 +409,265 @@ class Obstacle(GameObject):
         pygame.draw.circle(screen, (255, 100, 100),
                           (int(self.position.x), int(self.position.y)),
                           self.radius - 3)
+
+
+class Wormhole(GameObject):
+    """Teleportation portal - links two wormholes together"""
+
+    def __init__(self, x, y, partner_x=0, partner_y=0):
+        super().__init__(x, y, mass=0)
+        self.radius = 22
+        self.color = (0, 200, 255)
+        self.partner_pos = Vector2D(partner_x, partner_y)
+        self.partner = None  # Will be linked after creation
+        self.cooldown = 0  # Prevent instant re-teleport
+        self.spin_angle = 0
+        self.warp_particles = []
+
+    def link_partner(self, partner):
+        """Link this wormhole to its partner"""
+        self.partner = partner
+
+    def teleport(self, spaceship):
+        """Teleport the spaceship to the partner wormhole"""
+        if self.partner and self.cooldown <= 0:
+            spaceship.position = Vector2D(
+                self.partner.position.x,
+                self.partner.position.y
+            )
+            # Keep velocity but slightly randomize direction
+            speed = spaceship.velocity.magnitude()
+            angle = math.atan2(spaceship.velocity.y, spaceship.velocity.x)
+            angle += random.uniform(-0.3, 0.3)
+            spaceship.velocity = Vector2D(
+                math.cos(angle) * speed,
+                math.sin(angle) * speed
+            )
+            self.cooldown = 0.5
+            self.partner.cooldown = 0.5
+            return True
+        return False
+
+    def update(self, dt):
+        """Update wormhole animation"""
+        self.spin_angle += dt * 200
+        if self.cooldown > 0:
+            self.cooldown -= dt
+
+        # Update warp particles
+        if random.random() < 0.4:
+            angle = random.uniform(0, 2 * math.pi)
+            dist = random.uniform(15, 35)
+            self.warp_particles.append({
+                'angle': angle,
+                'dist': dist,
+                'life': 1.0,
+                'speed': random.uniform(1, 3)
+            })
+
+        for p in self.warp_particles[:]:
+            p['angle'] += p['speed'] * dt * 3
+            p['dist'] -= dt * 20
+            p['life'] -= dt * 1.5
+            if p['life'] <= 0 or p['dist'] <= 0:
+                self.warp_particles.remove(p)
+
+    def draw(self, screen):
+        """Draw wormhole with swirling portal effect"""
+        cx, cy = int(self.position.x), int(self.position.y)
+
+        # Draw swirling particles being sucked in
+        for p in self.warp_particles:
+            px = cx + int(math.cos(p['angle']) * p['dist'])
+            py = cy + int(math.sin(p['angle']) * p['dist'])
+            intensity = p['life']
+            color = (0, int(180 * intensity), int(255 * intensity))
+            pygame.draw.circle(screen, color, (px, py), 2)
+
+        # Draw outer swirl rings
+        for i in range(6):
+            angle = math.radians(self.spin_angle + i * 60)
+            ring_r = self.radius + 8 + math.sin(time.time() * 3 + i) * 4
+            rx = cx + int(math.cos(angle) * ring_r * 0.3)
+            ry = cy + int(math.sin(angle) * ring_r * 0.3)
+            ring_color = (0, int(150 + 50 * math.sin(time.time() * 2 + i)), 255)
+            pygame.draw.circle(screen, ring_color, (rx, ry), 3)
+
+        # Draw portal ring
+        pulse = abs(math.sin(time.time() * 3)) * 0.2 + 0.8
+        pygame.draw.circle(screen, (0, 180, 255), (cx, cy), int(self.radius * pulse), 3)
+
+        # Draw inner gradient
+        for r in range(self.radius - 2, 0, -3):
+            ratio = r / self.radius
+            color = (int(20 * ratio), int(50 + 100 * (1 - ratio)), int(200 + 55 * (1 - ratio)))
+            pygame.draw.circle(screen, color, (cx, cy), r)
+
+        # Bright center
+        pygame.draw.circle(screen, (150, 255, 255), (cx, cy), 4)
+
+        # Draw connection line to partner (faint)
+        if self.partner:
+            mid_x = (self.position.x + self.partner.position.x) / 2
+            mid_y = (self.position.y + self.partner.position.y) / 2
+            # Dashed line effect
+            steps = 12
+            for s in range(steps):
+                if s % 2 == 0:
+                    t1 = s / steps
+                    t2 = (s + 1) / steps
+                    x1 = int(self.position.x + (self.partner.position.x - self.position.x) * t1)
+                    y1 = int(self.position.y + (self.partner.position.y - self.position.y) * t1)
+                    x2 = int(self.position.x + (self.partner.position.x - self.position.x) * t2)
+                    y2 = int(self.position.y + (self.partner.position.y - self.position.y) * t2)
+                    pygame.draw.line(screen, (0, 80, 120), (x1, y1), (x2, y2), 1)
+
+
+class ExplosionEffect:
+    """Particle explosion effect when spaceship is destroyed"""
+
+    def __init__(self, x, y, color=(0, 255, 255)):
+        self.particles = []
+        self.active = True
+        self.lifetime = 1.5
+        self.timer = 0
+
+        # Create burst of particles
+        for _ in range(40):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(50, 250)
+            size = random.uniform(2, 6)
+            life = random.uniform(0.5, 1.5)
+
+            # Mix colors
+            r = min(255, color[0] + random.randint(-30, 80))
+            g = min(255, color[1] + random.randint(-30, 80))
+            b = min(255, color[2] + random.randint(-30, 80))
+
+            self.particles.append({
+                'x': float(x),
+                'y': float(y),
+                'vx': math.cos(angle) * speed,
+                'vy': math.sin(angle) * speed,
+                'size': size,
+                'life': life,
+                'max_life': life,
+                'color': (r, g, b)
+            })
+
+    def update(self, dt):
+        """Update all explosion particles"""
+        self.timer += dt
+        if self.timer >= self.lifetime:
+            self.active = False
+            return
+
+        for p in self.particles[:]:
+            p['x'] += p['vx'] * dt
+            p['y'] += p['vy'] * dt
+            p['vx'] *= 0.96  # Drag
+            p['vy'] *= 0.96
+            p['life'] -= dt
+            if p['life'] <= 0:
+                self.particles.remove(p)
+
+        if not self.particles:
+            self.active = False
+
+    def draw(self, screen):
+        """Draw explosion particles"""
+        for p in self.particles:
+            ratio = max(0, p['life'] / p['max_life'])
+            r = int(p['color'][0] * ratio)
+            g = int(p['color'][1] * ratio)
+            b = int(p['color'][2] * ratio)
+            size = max(1, int(p['size'] * ratio))
+            pygame.draw.circle(screen, (r, g, b), (int(p['x']), int(p['y'])), size)
+
+
+class Starfield:
+    """Animated starfield background with twinkling and parallax layers"""
+
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        self.layers = []
+
+        # Create 3 parallax layers (far, mid, near)
+        layer_configs = [
+            {'count': 80, 'min_size': 1, 'max_size': 1, 'speed': 0.1, 'brightness': 120},
+            {'count': 40, 'min_size': 1, 'max_size': 2, 'speed': 0.3, 'brightness': 180},
+            {'count': 20, 'min_size': 2, 'max_size': 3, 'speed': 0.6, 'brightness': 255},
+        ]
+
+        for config in layer_configs:
+            stars = []
+            for _ in range(config['count']):
+                stars.append({
+                    'x': random.randint(0, width),
+                    'y': random.randint(0, height),
+                    'size': random.randint(config['min_size'], config['max_size']),
+                    'brightness': config['brightness'],
+                    'twinkle_speed': random.uniform(1, 5),
+                    'twinkle_offset': random.uniform(0, math.pi * 2),
+                })
+            self.layers.append({'stars': stars, 'speed': config['speed']})
+
+        # Occasional shooting star
+        self.shooting_stars = []
+
+    def update(self, dt):
+        """Update starfield animation"""
+        # Random shooting stars
+        if random.random() < 0.003:
+            self.shooting_stars.append({
+                'x': random.randint(0, self.width),
+                'y': random.randint(0, int(self.height * 0.6)),
+                'vx': random.uniform(300, 600),
+                'vy': random.uniform(100, 200),
+                'life': 1.0,
+                'trail': []
+            })
+
+        for star in self.shooting_stars[:]:
+            star['trail'].append((star['x'], star['y']))
+            if len(star['trail']) > 8:
+                star['trail'].pop(0)
+            star['x'] += star['vx'] * dt
+            star['y'] += star['vy'] * dt
+            star['life'] -= dt * 2
+            if star['life'] <= 0 or star['x'] > self.width or star['y'] > self.height:
+                self.shooting_stars.remove(star)
+
+    def draw(self, screen):
+        """Draw the starfield"""
+        t = time.time()
+
+        for layer in self.layers:
+            for star in layer['stars']:
+                # Twinkle effect
+                twinkle = abs(math.sin(t * star['twinkle_speed'] + star['twinkle_offset']))
+                brightness = int(star['brightness'] * (0.4 + 0.6 * twinkle))
+
+                # Slight blue/white color variation
+                r = min(255, brightness + random.randint(-5, 5))
+                g = min(255, brightness + random.randint(-5, 5))
+                b = min(255, brightness + random.randint(0, 20))
+
+                pygame.draw.circle(screen, (r, g, b),
+                                 (int(star['x']), int(star['y'])),
+                                 star['size'])
+
+        # Draw shooting stars
+        for ss in self.shooting_stars:
+            intensity = ss['life']
+            if len(ss['trail']) > 1:
+                for i in range(1, len(ss['trail'])):
+                    alpha = (i / len(ss['trail'])) * intensity
+                    color = (int(255 * alpha), int(255 * alpha), int(200 * alpha))
+                    pygame.draw.line(screen, color,
+                                   (int(ss['trail'][i-1][0]), int(ss['trail'][i-1][1])),
+                                   (int(ss['trail'][i][0]), int(ss['trail'][i][1])), 2)
+            # Bright head
+            pygame.draw.circle(screen, (int(255 * intensity), int(255 * intensity), int(220 * intensity)),
+                             (int(ss['x']), int(ss['y'])), 2)
